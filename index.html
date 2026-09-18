@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>물 마시기 챌린지</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;background:#f3f7fb;color:#183044}
+.wrap{max-width:900px;margin:auto;padding:20px}.card{background:white;border-radius:18px;padding:20px;margin:14px 0;box-shadow:0 4px 18px #18304412}
+h1,h2,p{margin-top:0}.login{max-width:420px;margin:9vh auto}.field{margin:12px 0}.field label{display:block;font-size:13px;color:#667;margin-bottom:5px}
+input,button,select{width:100%;padding:13px;border-radius:11px;border:1px solid #d6e0e8;font-size:15px}button{background:#1677ff;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#eef4f8;color:#183044}
+.hidden{display:none}.top{display:flex;justify-content:space-between;align-items:center;gap:10px}.logout{width:auto;padding:8px 12px;background:#eef4f8;color:#183044}
+.progress{height:18px;background:#e9eff4;border-radius:99px;overflow:hidden}.bar{height:100%;background:#2b9cff;width:0;transition:.3s}
+.count{text-align:center;font-size:44px;font-weight:800;margin:10px 0}.sub{text-align:center;color:#667}
+.auth{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:15px}.auth div{text-align:center;padding:10px 2px;border-radius:10px;background:#edf2f6;font-size:18px}.auth .on{background:#cfeaff}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px;border-bottom:1px solid #edf0f2;text-align:center}th{background:#f7f9fb;position:sticky;top:0}
+.ok{color:#087f45;font-weight:700}.warn{color:#d77a00;font-weight:700}.small{font-size:12px;color:#71808d}.msg{padding:10px;border-radius:10px;background:#fff5d9;margin-top:10px}
+.error{background:#ffe8e8;color:#a11}.loading{opacity:.65;pointer-events:none}
+@media(max-width:600px){.wrap{padding:12px}.card{padding:16px}.auth{grid-template-columns:repeat(5,1fr)}table{font-size:11px}th,td{padding:7px 3px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+// =========================================
+// Supabase 연결 정보
+// publishable key는 브라우저에서 사용하는 공개 키입니다.
+// Service role key는 절대 넣지 마세요.
+// =========================================
+const SUPABASE_URL = "https://qxzqcifxxzaijliyjsld.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_M5fD5lXVN0ssLEBzS7L7rQ_J2QcAsLU";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// 인증 사진을 저장할 Supabase Storage 버킷 이름 (Storage에서 이 이름으로 버킷을 먼저 만들어야 합니다)
+const PHOTO_BUCKET = "water-photos";
+
+// 이 앱의 접속 링크 (QR코드가 가리키는 주소). 링크가 바뀌면 여기도 같이 바꿔주세요.
+const APP_URL = "https://wide99-kor.github.io/water-challenge/";
+const QR_DATA_URI_B64 = "iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQAAAADAX2ykAAAC20lEQVR4nO2cTYrcMBBGX8WCXrphDjBHsW+QI4W5mX2UOUBAXjbIfFlIsj0hmcmQTseCqoWxW29RUNSPSqo28RmZv3wKB+edd/6f8osVGZcAsFp9ACyBuh4eo4/zd+Y7SVIO1GYWsHG5yOy6mo19gkGSFB+lj/P35otzAgwRoE9oAjQtgezi4wP1cf5efDh+9DcDumSzdcngIoPuofo4/w/55aLquqtJSpSo/J/0cf6v+ey/ZZOU/XctPj1/jRh9AnoByyP0cf7+/JrL4+K/y0UMsZN9ew0wvAaYzczs+ih9nL8fH4pzZrmZ5uebab52UFw3cWyBnE1/59+XAMtTYh63X5aLbIhXq1Zdg1iekkGXzqe/8x+IFLtsSk0/LfUJ8u44AvSSprPp7/wHIkXQ1CtnXU25ft56Hv1eRHdu3+b4Yl9JKkZWKubO0tcF998W+WxaBiX2R976bp6cTavo/tsw36nk3yVgI1COG/qbaQJyJ/q8+jv/a9mTa82/W0Bm8+5Y0rH7b2t8zb/xTSWt2B3LrcPn2fR3/gORlGCI3ZtauSbcN5z7b5N8TrPFtDbW8wXmK7Xmip1KOj6h/s6/J3t8rk6sHJWrlCDt8blJ/ph/JygboqGUU3XjFAHvb7TIbxUyQL8btDu8lSLL82+DPKVvwdZ/7rVJ6WTlVbdvi3zdFdX+cw3NtQk9AXnV43OLfPHfrf9cSqvDIUO5P+n95yb5Q2mVzTjsDau4HQ3i8blRHh1k709CrpqrkWvgdvu2x+/zC6yWb10B6OVZYr6CjQ/Vx/k78oF87wYw6JLBaqL/HgzKjIpYVmM2v5/TKl/nF1YjnyS9htKYzrcrr1smPqf+zv8pr5fnW55FsRFKEp76m8+ntMlvp4K1YUW9i7N3outO2Pe/7fFv5he2t2ECWEKyISI7jIueTX/nP+b3+YVAHlOYzbJB9WLh2Ok4pf7O/17M/5/Beeeb5X8A4JNO+G9lvH0AAAAASUVORK5CYII=";
+
+// 현재 테스트 단계에서는 water01만 Supabase Auth 계정이 만들어져 있습니다.
+// 나머지 직원은 Auth 계정을 만든 뒤 아래 목록에 같은 형식으로 추가하면 됩니다.
+const USERS = [
+ {id:"water01",name:"김민수",dept:"생산팀",email:"water01@test.com"},
+ {id:"water02",name:"이준호",dept:"품질팀",email:"water02@test.com"},
+ {id:"water03",name:"박지훈",dept:"생산팀",email:"water03@test.com"},
+ {id:"water04",name:"최현우",dept:"기술팀",email:"water04@test.com"},
+ {id:"water05",name:"정우진",dept:"관리팀",email:"water05@test.com"},
+ {id:"water06",name:"한지민",dept:"품질팀",email:"water06@test.com"},
+ {id:"water07",name:"서준혁",dept:"생산팀",email:"water07@test.com"},
+ {id:"water08",name:"윤서연",dept:"기술팀",email:"water08@test.com"},
+ {id:"water09",name:"강도윤",dept:"생산팀",email:"water09@test.com"},
+ {id:"water10",name:"임채원",dept:"관리팀",email:"water10@test.com"}
+];
+
+let currentEmployee = null;
+let currentRecords = [];
+
+function $(id){return document.getElementById(id)}
+function todayKST(){
+  return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+}
+function startOfTodayKST(){ return new Date(todayKST()+"T00:00:00+09:00").toISOString(); }
+function startOfTomorrowKST(){
+  const d=new Date(todayKST()+"T00:00:00+09:00");
+  d.setUTCDate(d.getUTCDate()+1);
+  return d.toISOString();
+}
+function formatTime(value){
+  return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(value));
+}
+function photoUrl(path){
+  if(!path) return "";
+  const {data}=supabaseClient.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+  return data?.publicUrl||"";
+}
+function monthRangeKST(){
+  const now=new Date();
+  const y=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',year:'numeric'}).format(now);
+  const m=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',month:'2-digit'}).format(now);
+  const first=`${y}-${m}-01T00:00:00+09:00`;
+  const d=new Date(first); d.setUTCMonth(d.getUTCMonth()+1);
+  return {start:new Date(first).toISOString(),end:d.toISOString(),year:Number(y),month:Number(m)};
+}
+
+function loginPage(msg=""){
+ app.innerHTML=`<div class="wrap login"><div class="card">
+ <h1>💧 물 마시기 챌린지</h1>
+ <p class="small">Supabase 연동 테스트 버전</p>
+ <div class="field"><label>아이디</label><input id="uid" placeholder="water01" autocomplete="username"></div>
+ <div class="field"><label>비밀번호</label><input id="pw" type="password" placeholder="Supabase Auth 비밀번호" autocomplete="current-password"></div>
+ <button id="loginBtn" onclick="login()">로그인</button>
+ ${msg?`<div class="msg error">${msg}</div>`:""}
+ <p class="small" style="margin-top:14px">현재 테스트 가능한 계정: <b>water01</b></p>
+ <button type="button" class="secondary" style="margin-top:16px" onclick="toggleQR()">📱 QR코드로 다른 사람 초대하기</button>
+ <div id="qrBox" class="hidden" style="text-align:center;margin-top:14px">
+   <img src="data:image/png;base64,${QR_DATA_URI_B64}" style="width:160px;height:160px;border-radius:10px;border:1px solid #d6e0e8" alt="접속 QR코드">
+   <p class="small" style="margin-top:8px;word-break:break-all">${APP_URL}</p>
+ </div>
+ </div></div>`;
+}
+
+function toggleQR(){
+  const box=$('qrBox');
+  box.classList.toggle('hidden');
+}
+
+async function login(){
+ const id=$('uid').value.trim();
+ const pw=$('pw').value;
+ const u=USERS.find(x=>x.id===id);
+ if(!u){loginPage("등록되지 않은 아이디입니다. 현재는 water01만 Auth 테스트가 가능합니다.");return;}
+ const btn=$('loginBtn'); btn.classList.add('loading'); btn.textContent='로그인 중...';
+ const {error}=await supabaseClient.auth.signInWithPassword({email:u.email,password:pw});
+ if(error){btn.classList.remove('loading');btn.textContent='로그인';loginPage("로그인 실패: 아이디 또는 비밀번호를 확인하세요.");return;}
+ await loadCurrentEmployee();
+}
+
+async function loadCurrentEmployee(){
+ const {data:{user},error:authError}=await supabaseClient.auth.getUser();
+ if(authError||!user){loginPage();return;}
+ const {data,error}=await supabaseClient.from('employees').select('id,login_id,name,department,role,auth_user_id').eq('auth_user_id',user.id).maybeSingle();
+ if(error){loginPage('직원 정보를 불러오지 못했습니다: '+error.message);return;}
+ if(!data){await supabaseClient.auth.signOut();loginPage('Supabase Auth 계정과 직원 정보가 연결되지 않았습니다.');return;}
+ currentEmployee=data;
+ await userPage();
+}
+
+async function userPage(){
+ const {data,error}=await supabaseClient.from('water_records').select('id,employee_id,drank_at,photo_path').eq('employee_id',currentEmployee.id).gte('drank_at',startOfTodayKST()).lt('drank_at',startOfTomorrowKST()).order('drank_at',{ascending:true});
+ if(error){app.innerHTML=`<div class="wrap"><div class="card"><div class="msg error">기록을 불러오지 못했습니다: ${error.message}</div></div></div>`;return;}
+ currentRecords=data||[];
+ const n=currentRecords.length;
+ app.innerHTML=`<div class="wrap">
+ <div class="top"><div><b>💧 물 마시기 챌린지</b><div class="small">${currentEmployee.name} · ${currentEmployee.department}</div></div><button class="logout" onclick="logout()">로그아웃</button></div>
+ <div class="card">
+ <h2>오늘의 물 마시기</h2><p class="sub">${todayKST()}</p>
+ <div class="count"><span id="cnt">${n}</span> / 10회</div>
+ <div class="progress"><div class="bar" id="bar" style="width:${Math.min(n*10,100)}%"></div></div>
+ <div class="auth">${Array.from({length:10},(_,i)=>`<div class="${i<n?'on':''}">${i<n?'💧':'○'}</div>`).join('')}</div>
+ <button id="certBtn" style="margin-top:18px" onclick="certify()">📷 물 마시고 인증하기</button>
+ <input id="photo" type="file" accept="image/*" capture="environment" class="hidden">
+ <p class="small" style="margin-top:12px">인증 사진은 Supabase Storage(${PHOTO_BUCKET} 버킷)에 저장되고, 인증 횟수와 시간은 DB에 함께 저장됩니다.</p>
+ <div id="notice"></div>
+ ${n>0?`<div class="gallery" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px">${currentRecords.map(r=>`<a href="${photoUrl(r.photo_path)}" target="_blank"><img src="${photoUrl(r.photo_path)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:1px solid #e3ebf1" alt="인증 사진"></a>`).join('')}</div>`:''}
+ </div>
+ <div class="card"><h2>이번 달 기록</h2><div id="month">불러오는 중...</div></div>
+ </div>`;
+ renderMonth();
+}
+
+async function certify(){
+ if(currentRecords.length>=10){$('notice').innerHTML='<div class="msg">오늘 목표 10회를 달성했습니다! 🎉</div>';return;}
+ const btn=$('certBtn');
+ btn.disabled=true;btn.textContent='사진 선택 중...';
+ const photo=$('photo');
+ photo.value='';
+ photo.onchange=async()=>{
+   const file=photo.files[0];
+   if(!file){btn.disabled=false;btn.textContent='📷 물 마시고 인증하기';return;}
+   $('notice').innerHTML='';
+   btn.textContent='사진 업로드 중...';
+   const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+   const filePath=`${currentEmployee.login_id}/${todayKST()}_${Date.now()}.${ext}`;
+   const {error:uploadError}=await supabaseClient.storage.from(PHOTO_BUCKET).upload(filePath,file,{contentType:file.type||'image/jpeg'});
+   if(uploadError){
+     btn.disabled=false;btn.textContent='📷 물 마시고 인증하기';
+     $('notice').innerHTML='<div class="msg error">사진 업로드 실패: '+uploadError.message+'</div>';
+     return;
+   }
+   btn.textContent='기록 저장 중...';
+   const {error}=await supabaseClient.from('water_records').insert({
+     employee_id:currentEmployee.id,
+     drank_at:new Date().toISOString(),
+     photo_path:filePath
+   });
+   if(error){
+     btn.disabled=false;btn.textContent='📷 물 마시고 인증하기';
+     $('notice').innerHTML='<div class="msg error">저장 실패: '+error.message+'</div>';
+     return;
+   }
+   await userPage();
+ };
+ photo.click();
+}
+
+async function renderMonth(){
+ const range=monthRangeKST();
+ const {data,error}=await supabaseClient.from('water_records').select('drank_at').eq('employee_id',currentEmployee.id).gte('drank_at',range.start).lt('drank_at',range.end).order('drank_at',{ascending:true});
+ if(error){$('month').innerHTML='<div class="msg error">월간 기록을 불러오지 못했습니다.</div>';return;}
+ const byDay={};
+ (data||[]).forEach(r=>{
+   const ds=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(r.drank_at));
+   byDay[ds]=(byDay[ds]||0)+1;
+ });
+ const last=new Date(range.year,range.month,0).getDate();
+ const days=[];
+ for(let day=1;day<=last;day++){
+   const ds=`${range.year}-${String(range.month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+   const n=byDay[ds]||0;
+   days.push(`<tr><td>${ds}</td><td class="${n>=10?'ok':n>0?'warn':''}">${n}/10</td></tr>`);
+ }
+ $('month').innerHTML=`<table><tr><th>날짜</th><th>인증</th></tr>${days.join('')}</table>`;
+}
+
+async function logout(){
+ await supabaseClient.auth.signOut();
+ currentEmployee=null;currentRecords=[];loginPage();
+}
+
+async function boot(){
+ const {data:{session}}=await supabaseClient.auth.getSession();
+ if(session) await loadCurrentEmployee(); else loginPage();
+}
+
+boot();
+</script>
+</body></html>
