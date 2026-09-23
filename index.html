@@ -389,7 +389,22 @@ async function completeAccountSetup(){
   if(!/^[A-Za-z0-9_-]{3,30}$/.test(loginId)){accountSetupPage('아이디는 영문/숫자/_/- 3~30자로 입력해주세요.');return;}
   const btn=$('setupBtn'); btn.disabled=true; btn.classList.add('loading'); btn.textContent='설정 중...';
   const {data,error}=await supabaseClient.functions.invoke('account-management',{body:{action:'setup_account',login_id:loginId,password:pw,recovery_code:code}});
-  if(error||!data?.ok){btn.disabled=false;btn.classList.remove('loading');btn.textContent='계정 설정 완료';accountSetupPage(data?.error||error?.message||'계정 설정에 실패했습니다.');return;}
+  if(error||!data?.ok){
+    btn.disabled=false;btn.classList.remove('loading');btn.textContent='계정 설정 완료';
+    let detail=data?.error||'';
+    if(error){
+      detail += (detail?' / ':'') + (error.message||'Edge Function 호출 실패');
+      if(error.context){
+        try{
+          const body=await error.context.json();
+          if(body?.error) detail += ' / 서버: '+body.error;
+          else if(body) detail += ' / 서버응답: '+JSON.stringify(body);
+        }catch(_){}
+      }
+    }
+    accountSetupPage(detail||'계정 설정에 실패했습니다.');
+    return;
+  }
   await supabaseClient.auth.signOut(); currentEmployee=null; loginPage('계정 설정이 완료되었습니다. 새 아이디와 비밀번호로 로그인해주세요.');
 }
 
