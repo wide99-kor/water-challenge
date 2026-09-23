@@ -348,7 +348,8 @@ function accountSetupPage(msg=''){
       '<div id="setupPwMismatch" class="small hidden" style="color:#c62828;font-weight:700;margin-top:5px">비밀번호가 일치하지 않습니다.</div></div>'+
     '<div class="field"><label>개인 인증 코드</label><select id="setupRecoveryCode">'+recoveryCodeOptions()+'</select>'+
       '<div class="small" style="margin-top:6px">이 코드는 비밀번호를 잊어버렸을 때 임시 비밀번호를 받을 때 사용할 인증 코드입니다.</div></div>'+
-    '<button id="setupBtn" onclick="completeAccountSetup()">계정 설정 완료</button>'+\n    '<button type="button" class="secondary" style="margin-top:10px" onclick="returnToLoginFromSetup()">처음으로 돌아가기</button>'+
+    '<button id="setupBtn" onclick="completeAccountSetup()">계정 설정 완료</button>'+
+    '<button type="button" class="secondary" style="margin-top:10px" onclick="returnToLoginFromSetup()">처음으로 돌아가기</button>'+
     (msg?'<div class="msg error">'+escapeHtml(msg)+'</div>':'')+
     '</div></div>';
   setAccountIdMode(false);
