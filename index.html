@@ -92,7 +92,7 @@ const PHOTO_BUCKET = "water-photos";
 // =============================
 // 앱 버전 표시 (여기 숫자만 수정)
 // =============================
-const APP_VERSION = "alpha 0.0.8";
+const APP_VERSION = "alpha 0.0.9";
 // 사진 보관/용량 관리 설정
 const PHOTO_RETENTION_DAYS = 14;
 const PHOTO_TARGET_MAX_BYTES = 100 * 1024;   // 정상 압축 목표: 약 100KB 이하
@@ -388,7 +388,7 @@ async function completeAccountSetup(){
   if(pw!==confirm){validateSetupPasswordMatch();$('setupPwMismatch')?.classList.remove('hidden');return;}
   if(!/^[A-Za-z0-9_-]{3,30}$/.test(loginId)){accountSetupPage('아이디는 영문/숫자/_/- 3~30자로 입력해주세요.');return;}
   const btn=$('setupBtn'); btn.disabled=true; btn.classList.add('loading'); btn.textContent='설정 중...';
-  const {data,error}=await supabaseClient.functions.invoke('account-management',{body:{action:'setup_account',login_id:loginId,password:pw,recovery_code:code}});
+  const {data,error}=await supabaseClient.functions.invoke('account-setup',{body:{login_id:loginId,password:pw,recovery_code:code}});
   if(error||!data?.ok){
     btn.disabled=false;btn.classList.remove('loading');btn.textContent='계정 설정 완료';
     let detail=data?.error||'';
