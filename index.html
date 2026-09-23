@@ -92,7 +92,7 @@ const PHOTO_BUCKET = "water-photos";
 // =============================
 // 앱 버전 표시 (여기 숫자만 수정)
 // =============================
-const APP_VERSION = "alpha 0.0.4";
+const APP_VERSION = "alpha 0.0.5";
 // 사진 보관/용량 관리 설정
 const PHOTO_RETENTION_DAYS = 14;
 const PHOTO_TARGET_MAX_BYTES = 100 * 1024;   // 정상 압축 목표: 약 100KB 이하
@@ -220,6 +220,7 @@ function loginPage(msg=""){
  <div class="field"><label>아이디</label><input id="uid" placeholder="아이디를 입력하세요" autocomplete="username"></div>
  <div class="field"><label>비밀번호</label><input id="pw" type="password" placeholder="비밀번호를 입력하세요" autocomplete="current-password"></div>
  <button id="loginBtn" onclick="login()">로그인</button>
+ <button type="button" class="secondary" style="margin-top:10px" onclick="forgotPasswordPage()">🔑 비밀번호를 잊으셨나요?</button>
  ${msg?`<div class="msg error">${msg}</div>`:""}
  <button type="button" class="secondary" style="margin-top:16px" onclick="toggleQR()">📱 QR코드로 다른 사람 초대하기</button>
  <div id="qrBox" class="hidden" style="text-align:center;margin-top:14px">
@@ -316,11 +317,102 @@ async function updatePassword(){
 async function loadCurrentEmployee(){
  const {data:{user},error:authError}=await supabaseClient.auth.getUser();
  if(authError||!user){loginPage();return;}
- const {data,error}=await supabaseClient.from('employees').select('id,login_id,name,department,category,role,auth_user_id').eq('auth_user_id',user.id).maybeSingle();
+ const {data,error}=await supabaseClient.from('employees').select('id,login_id,name,department,category,role,auth_user_id,must_change_password').eq('auth_user_id',user.id).maybeSingle();
  if(error){loginPage('직원 정보를 불러오지 못했습니다: '+error.message);return;}
  if(!data){await supabaseClient.auth.signOut();loginPage('Supabase Auth 계정과 직원 정보가 연결되지 않았습니다.');return;}
  currentEmployee=data;
+ if(currentEmployee.must_change_password){ accountSetupPage(); return; }
  if(currentEmployee.role==='admin'){ await adminPage(); } else { await userPage(); }
+}
+
+function recoveryCodeOptions(selected='A'){
+  let s='';
+  for(let i=0;i<26;i++){ const c=String.fromCharCode(65+i); s+='<option value="'+c+'" '+(c===selected?'selected':'')+'>'+c+'</option>'; }
+  return s;
+}
+
+function accountSetupPage(msg=''){
+  const currentId=currentEmployee?.login_id || '';
+  app.innerHTML='<div class="wrap login"><div class="card">'+
+    '<h1>💧 물 마시기 챌린지</h1><div class="app-version">'+APP_VERSION+'</div>'+
+    '<h2 style="text-align:center;margin:4px 0 8px;font-size:20px">계정 설정</h2>'+
+    '<p class="small" style="text-align:center;margin-bottom:18px">첫 로그인에서 사용할 아이디와 비밀번호를 설정해주세요.</p>'+
+    '<div class="field"><label>아이디 변경 여부</label><div style="display:flex;gap:8px">'+
+      '<button id="keepIdBtn" type="button" class="secondary" onclick="setAccountIdMode(false)">현재 아이디 유지</button>'+
+      '<button id="changeIdBtn" type="button" onclick="setAccountIdMode(true)">아이디 변경</button></div></div>'+
+    '<div id="newIdField" class="field hidden"><label>새 아이디</label>'+
+      '<input id="setupLoginId" placeholder="새 아이디를 입력하세요" autocomplete="username">'+
+      '<div class="small" style="margin-top:5px">현재 발급된 아이디: '+escapeHtml(currentId)+'</div></div>'+
+    '<div class="field"><label>새 비밀번호</label><input id="setupPw" type="password" placeholder="새 비밀번호를 입력하세요" autocomplete="new-password"></div>'+
+    '<div class="field"><label>새 비밀번호 확인</label><input id="setupPwConfirm" type="password" placeholder="새 비밀번호를 다시 입력하세요" autocomplete="new-password" oninput="validateSetupPasswordMatch()">'+
+      '<div id="setupPwMismatch" class="small hidden" style="color:#c62828;font-weight:700;margin-top:5px">비밀번호가 일치하지 않습니다.</div></div>'+
+    '<div class="field"><label>개인 인증 코드</label><select id="setupRecoveryCode">'+recoveryCodeOptions()+'</select>'+
+      '<div class="small" style="margin-top:6px">이 코드는 비밀번호를 잊어버렸을 때 임시 비밀번호를 받을 때 사용할 인증 코드입니다.</div></div>'+
+    '<button id="setupBtn" onclick="completeAccountSetup()">계정 설정 완료</button>'+
+    (msg?'<div class="msg error">'+escapeHtml(msg)+'</div>':'')+
+    '</div></div>';
+  setAccountIdMode(false);
+}
+
+function setAccountIdMode(change){
+  const field=$('newIdField'), keep=$('keepIdBtn'), changeBtn=$('changeIdBtn');
+  if(!field||!keep||!changeBtn) return;
+  field.classList.toggle('hidden',!change);
+  keep.style.background=change?'#eef4f8':'#1677ff'; keep.style.color=change?'#183044':'#fff';
+  changeBtn.style.background=change?'#1677ff':'#eef4f8'; changeBtn.style.color=change?'#fff':'#183044';
+  if(!change && $('setupLoginId')) $('setupLoginId').value='';
+}
+
+function validateSetupPasswordMatch(){
+  const pw=$('setupPw'), c=$('setupPwConfirm'), w=$('setupPwMismatch');
+  if(!pw||!c||!w) return false;
+  const mismatch=c.value.length>0 && pw.value!==c.value;
+  w.classList.toggle('hidden',!mismatch);
+  return !mismatch;
+}
+
+async function completeAccountSetup(){
+  const changeId=!$('newIdField').classList.contains('hidden');
+  const loginId=changeId ? $('setupLoginId').value.trim() : currentEmployee.login_id;
+  const pw=$('setupPw').value, confirm=$('setupPwConfirm').value, code=$('setupRecoveryCode').value;
+  if(!loginId){accountSetupPage('새 아이디를 입력해주세요.');return;}
+  if(pw.length<6){accountSetupPage('비밀번호는 6자 이상 입력해주세요.');return;}
+  if(pw!==confirm){validateSetupPasswordMatch();$('setupPwMismatch')?.classList.remove('hidden');return;}
+  if(!/^[A-Za-z0-9_-]{3,30}$/.test(loginId)){accountSetupPage('아이디는 영문/숫자/_/- 3~30자로 입력해주세요.');return;}
+  const btn=$('setupBtn'); btn.disabled=true; btn.classList.add('loading'); btn.textContent='설정 중...';
+  const {data,error}=await supabaseClient.functions.invoke('account-management',{body:{action:'setup_account',login_id:loginId,password:pw,recovery_code:code}});
+  if(error||!data?.ok){btn.disabled=false;btn.classList.remove('loading');btn.textContent='계정 설정 완료';accountSetupPage(data?.error||error?.message||'계정 설정에 실패했습니다.');return;}
+  await supabaseClient.auth.signOut(); currentEmployee=null; loginPage('계정 설정이 완료되었습니다. 새 아이디와 비밀번호로 로그인해주세요.');
+}
+
+function forgotPasswordPage(msg=''){
+  app.innerHTML='<div class="wrap login"><div class="card">'+
+    '<h1>💧 물 마시기 챌린지</h1><div class="app-version">'+APP_VERSION+'</div>'+
+    '<h2 style="text-align:center;margin:4px 0 8px;font-size:20px">비밀번호 재설정</h2>'+
+    '<p class="small" style="text-align:center;margin-bottom:18px">아이디와 개인 인증 코드로 임시 비밀번호를 발급받습니다.</p>'+
+    '<div class="field"><label>아이디</label><input id="recoverLoginId" placeholder="아이디를 입력하세요" autocomplete="username"></div>'+
+    '<div class="field"><label>개인 인증 코드</label><select id="recoverCode">'+recoveryCodeOptions()+'</select>'+
+      '<div class="small" style="margin-top:6px">첫 계정 설정 때 선택한 영문 대문자 1개입니다.</div></div>'+
+    '<button id="recoverBtn" onclick="recoverPassword()">임시 비밀번호 받기</button>'+
+    '<button type="button" class="secondary" style="margin-top:10px" onclick="loginPage()">로그인으로 돌아가기</button>'+
+    (msg?'<div class="msg error">'+escapeHtml(msg)+'</div>':'')+
+    '</div></div>';
+}
+
+async function recoverPassword(){
+  const loginId=$('recoverLoginId').value.trim(), code=$('recoverCode').value;
+  if(!loginId){forgotPasswordPage('아이디를 입력해주세요.');return;}
+  const btn=$('recoverBtn'); btn.disabled=true; btn.classList.add('loading'); btn.textContent='확인 중...';
+  const {data,error}=await supabaseClient.functions.invoke('account-management',{body:{action:'recover_password',login_id:loginId,recovery_code:code}});
+  if(error||!data?.ok){btn.disabled=false;btn.classList.remove('loading');btn.textContent='임시 비밀번호 받기';forgotPasswordPage(data?.error||error?.message||'아이디 또는 인증 코드를 확인해주세요.');return;}
+  app.innerHTML='<div class="wrap login"><div class="card">'+
+    '<h1>💧 물 마시기 챌린지</h1><div class="app-version">'+APP_VERSION+'</div>'+
+    '<h2 style="text-align:center;margin:4px 0 8px;font-size:20px">임시 비밀번호 발급 완료</h2>'+
+    '<p class="small" style="text-align:center">본인 확인이 완료되었습니다.</p>'+
+    '<div class="msg" style="margin-top:16px"><div><b>아이디</b></div><div style="font-size:18px;margin-top:4px">'+escapeHtml(data.login_id)+'</div>'+
+    '<div style="margin-top:12px"><b>임시 비밀번호</b></div><div style="font-size:20px;letter-spacing:1px;margin-top:4px;word-break:break-all">'+escapeHtml(data.temporary_password)+'</div></div>'+
+    '<p class="small" style="margin-top:12px">임시 비밀번호로 로그인하면 새 비밀번호를 다시 설정해야 합니다.</p>'+
+    '<button type="button" onclick="loginPage()">로그인하기</button></div></div>';
 }
 
 async function userPage(){
@@ -1108,12 +1200,6 @@ async function boot(){
 
  // Supabase 비밀번호 재설정 링크로 들어온 경우 일반 로그인 화면 대신
  // 새 비밀번호 입력 화면을 보여줍니다.
- if(isRecoverySession()){
-   if(session) resetPasswordPage();
-   else resetPasswordPage('비밀번호 재설정 세션을 확인하지 못했습니다. 이메일의 링크를 다시 열어주세요.');
-   return;
- }
-
  if(session) await loadCurrentEmployee(); else loginPage();
 }
 
