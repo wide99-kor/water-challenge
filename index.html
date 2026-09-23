@@ -92,7 +92,7 @@ const PHOTO_BUCKET = "water-photos";
 // =============================
 // 앱 버전 표시 (여기 숫자만 수정)
 // =============================
-const APP_VERSION = "alpha 0.0.9";
+const APP_VERSION = "alpha 0.1.0";
 // 사진 보관/용량 관리 설정
 const PHOTO_RETENTION_DAYS = 14;
 const PHOTO_TARGET_MAX_BYTES = 100 * 1024;   // 정상 압축 목표: 약 100KB 이하
@@ -426,7 +426,7 @@ async function recoverPassword(){
   const loginId=$('recoverLoginId').value.trim(), code=$('recoverCode').value;
   if(!loginId){forgotPasswordPage('아이디를 입력해주세요.');return;}
   const btn=$('recoverBtn'); btn.disabled=true; btn.classList.add('loading'); btn.textContent='확인 중...';
-  const {data,error}=await supabaseClient.functions.invoke('account-management',{body:{action:'recover_password',login_id:loginId,recovery_code:code}});
+  const {data,error}=await supabaseClient.functions.invoke('password-recovery',{body:{login_id:loginId,recovery_code:code}});
   if(error||!data?.ok){btn.disabled=false;btn.classList.remove('loading');btn.textContent='임시 비밀번호 받기';forgotPasswordPage(data?.error||error?.message||'아이디 또는 인증 코드를 확인해주세요.');return;}
   app.innerHTML='<div class="wrap login"><div class="card">'+
     '<h1>💧 물 마시기 챌린지</h1><div class="app-version">'+APP_VERSION+'</div>'+
