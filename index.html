@@ -18,7 +18,7 @@ input,button,select{width:100%;padding:13px;border-radius:11px;border:1px solid 
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px;border-bottom:1px solid #edf0f2;text-align:center}th{background:#f7f9fb;position:sticky;top:0}
 .ok{color:#087f45;font-weight:700}.warn{color:#d77a00;font-weight:700}.app-version{text-align:center;margin-top:-8px;margin-bottom:14px;font-size:12px;color:#8a96a3;font-weight:500;letter-spacing:.2px}
 .small{font-size:12px;color:#71808d}.msg{padding:10px;border-radius:10px;background:#fff5d9;margin-top:10px}
-.error{background:#ffe8e8;color:#a11}.loading{opacity:.65;pointer-events:none}
+.error{background:#ffe8e8;color:#a11}.success{background:#e8f8ee;color:#176b3a}.loading{opacity:.65;pointer-events:none}
 @media(max-width:600px){.wrap{padding:12px}.card{padding:16px}.auth{grid-template-columns:repeat(5,1fr)}table{font-size:11px}th,td{padding:7px 3px}}
 
 .admin-row{cursor:pointer;transition:.15s}
@@ -92,7 +92,7 @@ const PHOTO_BUCKET = "water-photos";
 // =============================
 // 앱 버전 표시 (여기 숫자만 수정)
 // =============================
-const APP_VERSION = "alpha 0.1.1";
+const APP_VERSION = "alpha 0.1.2";
 // 사진 보관/용량 관리 설정
 const PHOTO_RETENTION_DAYS = 14;
 const PHOTO_TARGET_MAX_BYTES = 100 * 1024;   // 정상 압축 목표: 약 100KB 이하
@@ -214,14 +214,14 @@ function monthRangeKST(){
   return {start:new Date(first).toISOString(),end:d.toISOString(),year:Number(y),month:Number(m)};
 }
 
-function loginPage(msg=""){
+function loginPage(msg="",success=false){
  app.innerHTML=`<div class="wrap login"><div class="card">
  <h1>💧 물 마시기 챌린지</h1><div class="app-version">${APP_VERSION}</div>
  <div class="field"><label>아이디</label><input id="uid" placeholder="아이디를 입력하세요" autocomplete="username"></div>
  <div class="field"><label>비밀번호</label><input id="pw" type="password" placeholder="비밀번호를 입력하세요" autocomplete="current-password"></div>
  <button id="loginBtn" onclick="login()">로그인</button>
  <button type="button" class="secondary" style="margin-top:10px" onclick="forgotPasswordPage()">🔑 비밀번호를 잊으셨나요?</button>
- ${msg?`<div class="msg error">${msg}</div>`:""}
+ ${msg?`<div class="msg ${success?"success":"error"}">${msg}</div>`:""}
  <button type="button" class="secondary" style="margin-top:16px" onclick="toggleQR()">📱 QR코드로 다른 사람 초대하기</button>
  <div id="qrBox" class="hidden" style="text-align:center;margin-top:14px">
    <img src="data:image/png;base64,${QR_DATA_URI_B64}" style="width:160px;height:160px;border-radius:10px;border:1px solid #d6e0e8" alt="접속 QR코드">
@@ -405,7 +405,7 @@ async function completeAccountSetup(){
     accountSetupPage(detail||'계정 설정에 실패했습니다.');
     return;
   }
-  await supabaseClient.auth.signOut(); currentEmployee=null; loginPage('계정 설정이 완료되었습니다. 새 아이디와 비밀번호로 로그인해주세요.');
+  await supabaseClient.auth.signOut(); currentEmployee=null; loginPage('계정 설정이 완료되었습니다. 새 아이디와 비밀번호로 로그인해주세요.',true);
 }
 
 function forgotPasswordPage(msg=''){
@@ -436,25 +436,41 @@ async function recoverPassword(){
     btn.classList.remove('loading');
     btn.textContent='임시 비밀번호 받기';
 
+    let serverData=data;
+    if(error?.context){
+      try{
+        const body=await error.context.clone().json();
+        if(body) serverData=body;
+      }catch(_){}
+    }
+
+    console.error('password-recovery 호출 오류:',{error,data,serverData});
+
+    if(serverData?.code==='INVALID_RECOVERY_CODE'){
+      forgotPasswordPage('일치하지 않는 인증코드입니다.');
+      return;
+    }
+    if(serverData?.code==='PASSWORD_RESET_COOLDOWN'){
+      forgotPasswordPage(serverData.error||'임시 비밀번호는 3분에 한 번만 발급할 수 있습니다.');
+      return;
+    }
+    if(serverData?.code==='TOO_MANY_ATTEMPTS'){
+      forgotPasswordPage(serverData.error||'인증 시도가 너무 많습니다. 15분 후 다시 시도해주세요.');
+      return;
+    }
+
     let detail=[];
     if(error){
       detail.push('message: '+(error.message||''));
       if(error.name) detail.push('name: '+error.name);
-
       const ctx=error.context;
       if(ctx){
         if(typeof ctx.status==='number') detail.push('status: '+ctx.status);
         if(ctx.statusText) detail.push('statusText: '+ctx.statusText);
-        try{
-          const bodyText=await ctx.clone().text();
-          if(bodyText) detail.push('response: '+bodyText);
-        }catch(e){}
       }
     }
-    if(data && typeof data==='object') detail.push('data: '+JSON.stringify(data));
-
+    if(serverData && typeof serverData==='object') detail.push('server: '+JSON.stringify(serverData));
     const detailText=detail.join('\n');
-    console.error('password-recovery 호출 상세 오류:',{error,data,detail:detailText});
     forgotPasswordPage(
       '임시 비밀번호 발급에 실패했습니다.'+
       (detailText?'\n\n[상세 오류]\n'+detailText:'')
